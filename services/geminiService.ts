@@ -73,3 +73,35 @@ export const generateNicheAvatar = async (statement: string, referenceImage?: { 
     throw error;
   }
 };
+
+export const generateGithubReadme = async (statement: string, data: NicheData): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  const prompt = `
+    Create a professional GitHub Profile README.md snippet for a Senior Product Manager.
+    Niche Statement: "${statement}"
+    Problem Area: ${data.problem}
+    Environment: ${data.environment}
+    Style: ${data.style}
+
+    The README should include:
+    1. A header with the niche statement.
+    2. A "Superpowers" section (3 bullet points based on the style/problem).
+    3. A "Current Focus" section (based on the environment).
+    4. A call to action for collaboration.
+    
+    Format as beautiful Markdown. Use professional emojis. Avoid fluff.
+    Return ONLY the raw Markdown content.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+    });
+    return response.text?.trim() || `# Professional Product Manager\n\n${statement}`;
+  } catch (error) {
+    console.error("Gemini README Error:", error);
+    return `# Professional Product Manager\n\n${statement}`;
+  }
+};

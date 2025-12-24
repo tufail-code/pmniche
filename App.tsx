@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import { StepId, NicheData } from './types';
 import { PROBLEM_OPTIONS, ENVIRONMENT_OPTIONS, STYLE_OPTIONS } from './constants';
 import ProgressBar from './components/ProgressBar';
-import { refineNicheStatement, generateNicheAvatar } from './services/geminiService';
+import { refineNicheStatement, generateNicheAvatar, generateGithubReadme } from './services/geminiService';
 
 interface AIStudio {
   hasSelectedApiKey(): Promise<boolean>;
@@ -19,9 +19,11 @@ const App: React.FC = () => {
   });
   const [finalStatement, setFinalStatement] = useState<string>('');
   const [avatarUrl, setAvatarUrl] = useState<string>('');
+  const [githubReadme, setGithubReadme] = useState<string>('');
   const [uploadedImage, setUploadedImage] = useState<{ data: string, mimeType: string } | null>(null);
   const [isRefining, setIsRefining] = useState(false);
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
+  const [isGeneratingReadme, setIsGeneratingReadme] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -77,11 +79,25 @@ const App: React.FC = () => {
     }
   };
 
+  const handleGenerateReadme = async () => {
+    setIsGeneratingReadme(true);
+    setError(null);
+    try {
+      const readme = await generateGithubReadme(finalStatement, data);
+      setGithubReadme(readme);
+    } catch (err: any) {
+      setError("Failed to generate README snippet.");
+    } finally {
+      setIsGeneratingReadme(false);
+    }
+  };
+
   const reset = () => {
     setStep('welcome');
     setData({ problem: '', environment: '', style: '' });
     setFinalStatement('');
     setAvatarUrl('');
+    setGithubReadme('');
     setUploadedImage(null);
     setError(null);
   };
@@ -283,7 +299,6 @@ const App: React.FC = () => {
                   </h3>
                   
                   <div className="w-full flex flex-col gap-6">
-                    {/* Avatar Display */}
                     {avatarUrl ? (
                       <div className="w-full flex flex-col items-center">
                         <img src={avatarUrl} alt="Generated niche avatar" className="rounded-xl shadow-lg border border-white w-full max-w-sm aspect-square object-cover" />
@@ -293,7 +308,6 @@ const App: React.FC = () => {
                       <div className="space-y-4 w-full">
                         <p className="text-sm text-slate-500 italic text-center">Generate a 3D-styled profile avatar that matches your niche persona.</p>
                         
-                        {/* Upload Section */}
                         <div className="flex flex-col items-center p-4 border-2 border-dashed border-slate-300 rounded-xl hover:border-emerald-500 transition-colors bg-white">
                           <input 
                             type="file" 
@@ -344,6 +358,60 @@ const App: React.FC = () => {
                       </div>
                     )}
                   </div>
+                </div>
+
+                {/* GitHub Integration Section */}
+                <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-xl flex flex-col items-center">
+                   <h3 className="text-lg font-bold mb-4 flex items-center gap-2 self-start">
+                    <span className="text-2xl">🐙</span> Push to GitHub Profile
+                  </h3>
+                  
+                  {githubReadme ? (
+                    <div className="w-full space-y-4">
+                      <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 overflow-x-auto">
+                        <pre className="text-xs font-mono text-emerald-400 whitespace-pre-wrap">
+                          {githubReadme}
+                        </pre>
+                      </div>
+                      <div className="flex gap-3">
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(githubReadme);
+                            alert("GitHub Snippet copied!");
+                          }}
+                          className="flex-1 py-3 bg-white text-slate-900 font-bold rounded-xl hover:bg-slate-100 transition-colors text-sm"
+                        >
+                          Copy Markdown
+                        </button>
+                        <button 
+                          onClick={() => window.open('https://github.com/new', '_blank')}
+                          className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors text-sm"
+                        >
+                          Push to New Repo
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-full space-y-4 text-center">
+                      <p className="text-sm text-slate-400 italic">Generate a professional GitHub Profile README snippet optimized for your niche.</p>
+                      <button 
+                        onClick={handleGenerateReadme}
+                        disabled={isGeneratingReadme}
+                        className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-md ${
+                          isGeneratingReadme 
+                          ? 'bg-slate-700 text-slate-500 cursor-not-allowed' 
+                          : 'bg-white text-slate-900 hover:bg-slate-100'
+                        }`}
+                      >
+                        {isGeneratingReadme ? (
+                          <>
+                            <div className="w-5 h-5 border-2 border-slate-900/30 border-t-slate-900 rounded-full animate-spin"></div>
+                            Architecting Portfolio...
+                          </>
+                        ) : 'Generate GitHub README Asset'}
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {error && (
