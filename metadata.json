@@ -1,0 +1,7 @@
+{
+  "name": "PM Niche Discoverer",
+  "description": "A professional tool for Product Managers to define their unique market positioning using the 3-question niche formula.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
