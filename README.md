@@ -1,20 +1,29 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# PM Niche Discoverer Deployment Guide
 
-# Run and deploy your AI Studio app
+This app is ready to be hosted on Netlify.
 
-This contains everything you need to run your app locally.
+## How to Deploy
 
-View your app in AI Studio: https://ai.studio/apps/drive/1FNuLhlh3nSh8Xr0pqvAOI1Wxq9RPsVhm
+1. **Push to GitHub**
+   Initialize a git repo and push these files to a new GitHub repository.
 
-## Run Locally
+2. **Connect to Netlify**
+   - Go to [Netlify](https://app.netlify.com/).
+   - Click **Add new site** > **Import from existing project**.
+   - Select **GitHub** and choose your repository.
 
-**Prerequisites:**  Node.js
+3. **Set Environment Variables (CRITICAL)**
+   The app requires a Google Gemini API Key to function.
+   - In your Netlify Site Dashboard, go to **Site configuration** > **Environment variables**.
+   - Click **Add a variable**.
+   - Key: `API_KEY`
+   - Value: `YOUR_GEMINI_API_KEY_HERE`
 
+4. **Verify Redirects**
+   The included `netlify.toml` ensures that if a user refreshes the page on a sub-route, the app doesn't return a 404 error.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Tech Stack
+- **React 19**
+- **Tailwind CSS**
+- **Google Gemini API** (Gemini 3 Flash & 2.5 Flash Image)
+- **ESM Modules** (No-build direct serving)
