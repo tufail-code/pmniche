@@ -3,7 +3,9 @@ import React, { useState, useRef } from 'react';
 import { StepId, NicheData } from './types';
 import { PROBLEM_OPTIONS, ENVIRONMENT_OPTIONS, STYLE_OPTIONS } from './constants';
 import ProgressBar from './components/ProgressBar';
-import { refineNicheStatement, generateNicheAvatar, generateGithubReadme } from './services/geminiService';
+import { refineNicheStatement, generateNicheAvatar, optimizeInput } from './services/geminiService';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 interface AIStudio {
   hasSelectedApiKey(): Promise<boolean>;
@@ -17,15 +19,17 @@ const App: React.FC = () => {
     environment: '',
     style: '',
   });
+  const [customInput, setCustomInput] = useState<string>('');
   const [finalStatement, setFinalStatement] = useState<string>('');
   const [avatarUrl, setAvatarUrl] = useState<string>('');
-  const [githubReadme, setGithubReadme] = useState<string>('');
   const [uploadedImage, setUploadedImage] = useState<{ data: string, mimeType: string } | null>(null);
   const [isRefining, setIsRefining] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
-  const [isGeneratingReadme, setIsGeneratingReadme] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const resultCardRef = useRef<HTMLDivElement>(null);
 
   const getAIStudio = (): AIStudio => (window as any).aistudio;
 
@@ -35,6 +39,30 @@ const App: React.FC = () => {
 
   const handleNext = (nextStep: StepId) => {
     setStep(nextStep);
+    setCustomInput('');
+  };
+
+  const handleCustomSubmit = (key: keyof NicheData, nextStep: StepId | 'generate') => {
+    if (!customInput.trim()) return;
+    updateData(key, customInput.trim());
+    if (nextStep === 'generate') {
+      generateAndRefine();
+    } else {
+      handleNext(nextStep);
+    }
+  };
+
+  const handleMagicPolish = async (category: string) => {
+    if (!customInput.trim()) return;
+    setIsOptimizing(true);
+    try {
+      const optimized = await optimizeInput(category, customInput);
+      setCustomInput(optimized);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsOptimizing(false);
+    }
   };
 
   const generateAndRefine = async () => {
@@ -79,25 +107,58 @@ const App: React.FC = () => {
     }
   };
 
-  const handleGenerateReadme = async () => {
-    setIsGeneratingReadme(true);
-    setError(null);
+  const handleExportImage = async () => {
+    if (!resultCardRef.current) return;
+    setIsExporting(true);
     try {
-      const readme = await generateGithubReadme(finalStatement, data);
-      setGithubReadme(readme);
-    } catch (err: any) {
-      setError("Failed to generate README snippet.");
+      const canvas = await html2canvas(resultCardRef.current, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+      });
+      const link = document.createElement('a');
+      link.download = `PM-Niche-${Date.now()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (err) {
+      console.error("Export failed:", err);
+      alert("Failed to export image.");
     } finally {
-      setIsGeneratingReadme(false);
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (!resultCardRef.current) return;
+    setIsExporting(true);
+    try {
+      const canvas = await html2canvas(resultCardRef.current, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'px',
+        format: [canvas.width / 2, canvas.height / 2]
+      });
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+      pdf.save(`PM-Niche-${Date.now()}.pdf`);
+    } catch (err) {
+      console.error("PDF Export failed:", err);
+      alert("Failed to export PDF.");
+    } finally {
+      setIsExporting(false);
     }
   };
 
   const reset = () => {
     setStep('welcome');
     setData({ problem: '', environment: '', style: '' });
+    setCustomInput('');
     setFinalStatement('');
     setAvatarUrl('');
-    setGithubReadme('');
     setUploadedImage(null);
     setError(null);
   };
@@ -109,6 +170,52 @@ const App: React.FC = () => {
     'style': 3,
     'result': 4
   }[step];
+
+  const renderCustomInputSection = (category: string, key: keyof NicheData, nextStep: StepId | 'generate') => (
+    <div className="mt-4 space-y-3">
+      <div className="flex gap-2 relative">
+        <input 
+          type="text" 
+          value={customInput}
+          onChange={(e) => setCustomInput(e.target.value)}
+          placeholder={`Describe your own ${category.toLowerCase()}...`}
+          className={`flex-1 p-4 border-2 border-dashed border-slate-300 rounded-xl focus:border-blue-500 outline-none transition-all ${isOptimizing ? 'opacity-50' : 'opacity-100'}`}
+          onKeyDown={(e) => e.key === 'Enter' && handleCustomSubmit(key, nextStep)}
+          disabled={isOptimizing}
+        />
+        {customInput.trim() && !isOptimizing && (
+          <button 
+            onClick={() => handleMagicPolish(category)}
+            className="absolute right-[110px] top-1/2 -translate-y-1/2 p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors group"
+            title="Polish with AI"
+          >
+            <span className="text-xl group-hover:scale-110 transition-transform block">✨</span>
+          </button>
+        )}
+        {isOptimizing && (
+          <div className="absolute right-[110px] top-1/2 -translate-y-1/2">
+            <div className="w-5 h-5 border-2 border-emerald-500/20 border-t-emerald-600 rounded-full animate-spin"></div>
+          </div>
+        )}
+        {customInput.trim() && (
+          <button 
+            onClick={() => handleCustomSubmit(key, nextStep)}
+            disabled={isOptimizing}
+            className={`px-6 font-bold rounded-xl transition-all shadow-md animate-in slide-in-from-right-2 ${
+              nextStep === 'generate' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'
+            } text-white`}
+          >
+            {nextStep === 'generate' ? 'Finalize' : 'Next'}
+          </button>
+        )}
+      </div>
+      {customInput.trim() && !isOptimizing && (
+        <p className="text-[10px] text-slate-400 italic px-1 flex items-center gap-1">
+          <span className="text-emerald-500">✨</span> Click the wand to polish your phrasing with AI
+        </p>
+      )}
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
@@ -159,19 +266,7 @@ const App: React.FC = () => {
                   <p className="text-sm text-slate-500">{opt.description}</p>
                 </button>
               ))}
-              <div className="mt-4">
-                <input 
-                  type="text" 
-                  placeholder="Or type your own..."
-                  className="w-full p-4 border-2 border-dashed border-slate-300 rounded-xl focus:border-blue-500 outline-none"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && (e.target as HTMLInputElement).value) {
-                      updateData('problem', (e.target as HTMLInputElement).value);
-                      handleNext('environment');
-                    }
-                  }}
-                />
-              </div>
+              {renderCustomInputSection('Problem', 'problem', 'environment')}
             </div>
           </div>
         )}
@@ -191,19 +286,7 @@ const App: React.FC = () => {
                   <p className="text-sm text-slate-500">{opt.description}</p>
                 </button>
               ))}
-              <div className="mt-4">
-                <input 
-                  type="text" 
-                  placeholder="Specific sector (e.g. HealthTech, AI Logistics)..."
-                  className="w-full p-4 border-2 border-dashed border-slate-300 rounded-xl focus:border-blue-500 outline-none"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && (e.target as HTMLInputElement).value) {
-                      updateData('environment', (e.target as HTMLInputElement).value);
-                      handleNext('style');
-                    }
-                  }}
-                />
-              </div>
+              {renderCustomInputSection('Environment', 'environment', 'style')}
             </div>
             <button onClick={() => setStep('problem')} className="text-sm text-slate-400 hover:text-blue-600 flex items-center gap-1">
               ← Go back
@@ -226,19 +309,7 @@ const App: React.FC = () => {
                   <p className="text-sm text-slate-500">{opt.description}</p>
                 </button>
               ))}
-              <div className="mt-4">
-                <input 
-                  type="text" 
-                  placeholder="Your unique leadership style..."
-                  className="w-full p-4 border-2 border-dashed border-slate-300 rounded-xl focus:border-blue-500 outline-none"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && (e.target as HTMLInputElement).value) {
-                      updateData('style', (e.target as HTMLInputElement).value);
-                      generateAndRefine();
-                    }
-                  }}
-                />
-              </div>
+              {renderCustomInputSection('Style', 'style', 'generate')}
             </div>
             <button onClick={() => setStep('environment')} className="text-sm text-slate-400 hover:text-blue-600 flex items-center gap-1">
               ← Go back
@@ -253,7 +324,7 @@ const App: React.FC = () => {
               <p className="text-slate-500 mt-2">Positioning = Noise into Signal.</p>
             </div>
 
-            <div className="relative bg-gradient-to-br from-blue-900 to-emerald-900 p-1 rounded-2xl shadow-2xl overflow-hidden">
+            <div ref={resultCardRef} className="relative bg-gradient-to-br from-blue-900 to-emerald-900 p-1 rounded-2xl shadow-2xl overflow-hidden">
               <div className="bg-white p-8 rounded-[0.9rem] relative z-10 flex flex-col md:flex-row gap-6 items-center">
                 {isRefining ? (
                   <div className="flex flex-col items-center py-10 w-full space-y-4">
@@ -264,7 +335,7 @@ const App: React.FC = () => {
                   <>
                     {avatarUrl && (
                       <div className="shrink-0">
-                        <img src={avatarUrl} alt="Niche Avatar" className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-blue-50 shadow-lg object-cover" />
+                        <img crossOrigin="anonymous" src={avatarUrl} alt="Niche Avatar" className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-blue-50 shadow-lg object-cover" />
                       </div>
                     )}
                     <div className="space-y-6 flex-1 text-center md:text-left">
@@ -293,18 +364,13 @@ const App: React.FC = () => {
 
             {!isRefining && (
               <div className="space-y-6">
-                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex flex-col items-center">
-                  <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2 self-start">
-                    <span className="text-emerald-600">👤</span> AI Niche Avatar
-                  </h3>
-                  
-                  <div className="w-full flex flex-col gap-6">
-                    {avatarUrl ? (
-                      <div className="w-full flex flex-col items-center">
-                        <img src={avatarUrl} alt="Generated niche avatar" className="rounded-xl shadow-lg border border-white w-full max-w-sm aspect-square object-cover" />
-                        <p className="text-[10px] text-slate-400 mt-2 text-center italic">Persona Representation (Nano Banana)</p>
-                      </div>
-                    ) : (
+                {!avatarUrl && (
+                  <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex flex-col items-center">
+                    <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2 self-start">
+                      <span className="text-emerald-600">👤</span> AI Niche Avatar
+                    </h3>
+                    
+                    <div className="w-full flex flex-col gap-6">
                       <div className="space-y-4 w-full">
                         <p className="text-sm text-slate-500 italic text-center">Generate a 3D-styled profile avatar that matches your niche persona.</p>
                         
@@ -356,66 +422,32 @@ const App: React.FC = () => {
                           )}
                         </button>
                       </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* GitHub Integration Section */}
-                <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-xl flex flex-col items-center">
-                   <h3 className="text-lg font-bold mb-4 flex items-center gap-2 self-start">
-                    <span className="text-2xl">🐙</span> Push to GitHub Profile
-                  </h3>
-                  
-                  {githubReadme ? (
-                    <div className="w-full space-y-4">
-                      <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 overflow-x-auto">
-                        <pre className="text-xs font-mono text-emerald-400 whitespace-pre-wrap">
-                          {githubReadme}
-                        </pre>
-                      </div>
-                      <div className="flex flex-col gap-3">
-                        <div className="flex gap-3">
-                          <button 
-                            onClick={() => {
-                              navigator.clipboard.writeText(githubReadme);
-                              alert("GitHub Snippet copied!");
-                            }}
-                            className="flex-1 py-3 bg-white text-slate-900 font-bold rounded-xl hover:bg-slate-100 transition-colors text-sm"
-                          >
-                            Copy Markdown
-                          </button>
-                          <button 
-                            onClick={() => window.open('https://github.com/new', '_blank')}
-                            className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors text-sm"
-                          >
-                            Push to New Repo
-                          </button>
-                        </div>
-                        <p className="text-[10px] text-slate-500 text-center">💡 Pro Tip: Deploy this project to Netlify for a live branding page.</p>
-                      </div>
                     </div>
-                  ) : (
-                    <div className="w-full space-y-4 text-center">
-                      <p className="text-sm text-slate-400 italic">Generate a professional GitHub Profile README snippet optimized for your niche.</p>
+                  </div>
+                )}
+
+                {avatarUrl && (
+                  <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100 text-center">
+                    <h3 className="text-lg font-bold text-emerald-900 mb-2">Export Your Personal Brand</h3>
+                    <p className="text-sm text-emerald-700 mb-6">Save your niche card for LinkedIn, Resumes, or Portfolio.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <button 
-                        onClick={handleGenerateReadme}
-                        disabled={isGeneratingReadme}
-                        className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-md ${
-                          isGeneratingReadme 
-                          ? 'bg-slate-700 text-slate-500 cursor-not-allowed' 
-                          : 'bg-white text-slate-900 hover:bg-slate-100'
-                        }`}
+                        onClick={handleExportImage}
+                        disabled={isExporting}
+                        className="py-3 bg-white border-2 border-emerald-200 text-emerald-700 font-bold rounded-xl hover:bg-emerald-100 transition-all flex items-center justify-center gap-2"
                       >
-                        {isGeneratingReadme ? (
-                          <>
-                            <div className="w-5 h-5 border-2 border-slate-900/30 border-t-slate-900 rounded-full animate-spin"></div>
-                            Architecting Portfolio...
-                          </>
-                        ) : 'Generate GitHub README Asset'}
+                        {isExporting ? 'Exporting...' : '💾 Save as PNG'}
+                      </button>
+                      <button 
+                        onClick={handleExportPDF}
+                        disabled={isExporting}
+                        className="py-3 bg-white border-2 border-emerald-200 text-emerald-700 font-bold rounded-xl hover:bg-emerald-100 transition-all flex items-center justify-center gap-2"
+                      >
+                        {isExporting ? 'Exporting...' : '📄 Save as PDF'}
                       </button>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {error && (
                   <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm font-medium border border-red-100">
@@ -423,7 +455,7 @@ const App: React.FC = () => {
                   </div>
                 )}
 
-                <div className="space-y-4">
+                <div className="space-y-4 pt-4 border-t border-slate-100">
                   <button 
                     onClick={() => {
                       navigator.clipboard.writeText(finalStatement);
@@ -431,14 +463,14 @@ const App: React.FC = () => {
                     }}
                     className="w-full py-3 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-xl transition-all"
                   >
-                    Copy Statement
+                    Copy Statement Text
                   </button>
                   <div className="grid grid-cols-2 gap-3">
                     <button 
                       onClick={generateAndRefine}
                       className="py-3 border-2 border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold rounded-xl transition-all"
                     >
-                      Regenerate Statement
+                      Regenerate
                     </button>
                     <button 
                       onClick={reset}

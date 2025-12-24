@@ -30,6 +30,34 @@ export const refineNicheStatement = async (data: NicheData): Promise<string> => 
   }
 };
 
+export const optimizeInput = async (category: string, value: string): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  const prompt = `
+    You are a world-class Executive PM Coach. 
+    Convert this rough draft of a "${category}" into a professional, punchy, and high-impact PM phrase.
+    
+    Draft: "${value}"
+    
+    Rules:
+    - Keep it under 8 words.
+    - Use active verbs (e.g., Optimizing, Orchestrating, Scaling).
+    - Make it sound senior and specific.
+    - Return ONLY the optimized text.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+    });
+    return response.text?.trim() || value;
+  } catch (error) {
+    console.error("Optimization Error:", error);
+    return value;
+  }
+};
+
 export const generateNicheAvatar = async (statement: string, referenceImage?: { data: string, mimeType: string }): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
@@ -50,7 +78,7 @@ export const generateNicheAvatar = async (statement: string, referenceImage?: { 
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image', // Maps to "nano banana"
+      model: 'gemini-2.5-flash-image',
       contents: { parts },
       config: {
         imageConfig: {
@@ -71,37 +99,5 @@ export const generateNicheAvatar = async (statement: string, referenceImage?: { 
   } catch (error) {
     console.error("Avatar Generation Error:", error);
     throw error;
-  }
-};
-
-export const generateGithubReadme = async (statement: string, data: NicheData): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
-  const prompt = `
-    Create a professional GitHub Profile README.md snippet for a Senior Product Manager.
-    Niche Statement: "${statement}"
-    Problem Area: ${data.problem}
-    Environment: ${data.environment}
-    Style: ${data.style}
-
-    The README should include:
-    1. A header with the niche statement.
-    2. A "Superpowers" section (3 bullet points based on the style/problem).
-    3. A "Current Focus" section (based on the environment).
-    4. A call to action for collaboration.
-    
-    Format as beautiful Markdown. Use professional emojis. Avoid fluff.
-    Return ONLY the raw Markdown content.
-  `;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-    });
-    return response.text?.trim() || `# Professional Product Manager\n\n${statement}`;
-  } catch (error) {
-    console.error("Gemini README Error:", error);
-    return `# Professional Product Manager\n\n${statement}`;
   }
 };
