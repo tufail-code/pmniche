@@ -373,22 +373,25 @@ const App: React.FC = () => {
                           {githubReadme}
                         </pre>
                       </div>
-                      <div className="flex gap-3">
-                        <button 
-                          onClick={() => {
-                            navigator.clipboard.writeText(githubReadme);
-                            alert("GitHub Snippet copied!");
-                          }}
-                          className="flex-1 py-3 bg-white text-slate-900 font-bold rounded-xl hover:bg-slate-100 transition-colors text-sm"
-                        >
-                          Copy Markdown
-                        </button>
-                        <button 
-                          onClick={() => window.open('https://github.com/new', '_blank')}
-                          className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors text-sm"
-                        >
-                          Push to New Repo
-                        </button>
+                      <div className="flex flex-col gap-3">
+                        <div className="flex gap-3">
+                          <button 
+                            onClick={() => {
+                              navigator.clipboard.writeText(githubReadme);
+                              alert("GitHub Snippet copied!");
+                            }}
+                            className="flex-1 py-3 bg-white text-slate-900 font-bold rounded-xl hover:bg-slate-100 transition-colors text-sm"
+                          >
+                            Copy Markdown
+                          </button>
+                          <button 
+                            onClick={() => window.open('https://github.com/new', '_blank')}
+                            className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors text-sm"
+                          >
+                            Push to New Repo
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-slate-500 text-center">💡 Pro Tip: Deploy this project to Netlify for a live branding page.</p>
                       </div>
                     </div>
                   ) : (
