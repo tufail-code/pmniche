@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { StepId, NicheData } from './types';
 import { PROBLEM_OPTIONS, ENVIRONMENT_OPTIONS, STYLE_OPTIONS } from './constants';
@@ -340,7 +339,7 @@ const App: React.FC = () => {
                     )}
                     <div className="space-y-6 flex-1 text-center md:text-left">
                       <p className="text-2xl md:text-3xl font-bold text-slate-800 leading-snug">
-                        "{finalStatement}"
+                        {finalStatement}
                       </p>
                       <div className="border-t border-slate-100 pt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
